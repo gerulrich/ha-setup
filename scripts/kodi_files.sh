@@ -25,7 +25,7 @@ if [ "$location" == "${ENCRYPTED_MEDIA_LOCATION}" ]; then
         dir=$(dirname $file)
         if [ "$extension" = "mp4" ] || [ $extension = "mkv" ];
         then
-            gpg --output "/media/seagate/.varios/${filename}.gpg" --encrypt -r ${GPG_KEY} "$location/$file" && \
+            gpg --output "${ENCRYPTED_MEDIA_LOCATION}/${filename}.gpg" --encrypt -r ${GPG_KEY} "$location/$file" && \
             /usr/bin/curl --insecure -X POST $TELEGRAM_URL -d chat_id=$CHAT_ID -d text="Done." &
         fi
     done
