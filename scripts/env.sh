@@ -9,4 +9,11 @@
 
 ROUTER_IP="192.168.0.2"
 KEY_FILE=~/id_rsa_tplink
+TV_SHOWS_DIR=
+GPG_KEY=
+TELEGRAM_TOKEN=
+TELEGRAM_URL="https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage"
+CHAT_ID=
+TV_SHOW_MEDIA_LOCATION=/media/seagate/series
+ENCRYPTED_MEDIA_LOCATION=/media/seagate/.varios
 OPEN_PORT_RULE_NAME='http odroid forward'
