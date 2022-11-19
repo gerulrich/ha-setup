@@ -9,3 +9,4 @@
 
 ROUTER_IP="192.168.0.2"
 KEY_FILE=~/id_rsa_tplink
+OPEN_PORT_RULE_NAME='http odroid forward'
