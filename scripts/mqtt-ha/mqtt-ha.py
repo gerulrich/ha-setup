@@ -20,7 +20,6 @@ devices = {
   "mac_book_pro": "192.168.0.168"
 }
 
-# TODO path al script  mediante env variable
 def on_camera_message(payload):
     os.system(f'{script_dir}/security_cam.sh')
     result = {
@@ -30,7 +29,6 @@ def on_camera_message(payload):
     logging.info("Sending image path to topic '/camera/snapshot/output'")
     client.publish("/camera/snapshot/output", json.dumps(result))
 
-# TODO path a los scripts mediante env variable
 def on_firewall_message(payload):
     device=payload["device"]
     if payload["status"] == "on":
