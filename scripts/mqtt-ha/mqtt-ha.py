@@ -34,10 +34,22 @@ def on_firewall_message(payload):
     if payload["status"] == "on":
         logging.info(f'Enable internet on {device} device with ip {devices[device]}')
         os.system(f'{script_dir}/enable_internet.sh {devices[device]}')
+        client.publish("/firewall/forward/result", "enabled")
     else:
         logging.info(f'Disable internet on {device} device with ip {devices[device]}')
         os.system(f'{script_dir}/disable_internet.sh {devices[device]}')
-        client.publish("/firewall/forward/result", "ok")
+        client.publish("/firewall/forward/result", "disabled")
+
+def on_firewall_redirect_message(payload):
+    device=payload["device"]
+    if payload["status"] == "on":
+        logging.info("Opening port 80")
+        os.system(f'{script_dir}/open_http_port.sh {devices[device]}')
+        client.publish("/firewall/redirect/result", "opened")
+    else:
+        logging.info("Closing port 80")
+        os.system(f'{script_dir}/close_http_port.sh {devices[device]}')
+        client.publish("/firewall/redirect/result", "closed")
 
 def on_wifi_message(payload):
     logging.info("Reiniciando wifi")
@@ -51,6 +63,8 @@ def on_message(mclient, userdata, message):
             on_camera_message(payload)
         case "/firewall/forward":
             on_firewall_message(payload)
+        case "/firewall/redirect":
+            on_firewall_redirect_message(payload)
         case "/wifi/radio0":
             on_wifi_message(payload)
         case _:
@@ -69,7 +83,8 @@ if __name__ == "__main__":
         client.username_pw_set(mqtt_user, mqtt_pass)
         client.connect(mqtt_host)
         client.subscribe("/camera/foto/action")
-        client.subscribe("/internet/access")
+        client.subscribe("/firewall/forward")
+        client.subscribe("/firewall/redirect")
         client.subscribe("/wifi/radio0")
         client.on_message=on_message
         client.loop_forever()
