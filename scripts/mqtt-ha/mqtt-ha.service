@@ -1,0 +1,19 @@
+#################################################
+# Update path on WorkingDirectory and ExecStart #
+#################################################
+
+[Unit]
+Description=MQTT Home Assistant custom integrations
+After=network-online.target mosquitto.service
+
+[Service]
+Type=simple
+# Another Type: forking
+User=odroid
+WorkingDirectory=/storage/scripts
+ExecStart=python3 /storage/scripts/mqtt-ha.py
+Restart=on-failure
+# Other restart options: always, on-abort, etc
+
+[Install]
+WantedBy=multi-user.target
