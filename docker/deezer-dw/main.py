@@ -59,7 +59,7 @@ def get_deezer_track_info(track):
     contributors = []
     for c in response['contributors']:
         contributors.append(sanitize(c['name']))        
-    return (response['track_position'], sanitize(response['title']), "  ".join(contributors), response['isrc'])
+    return (response['track_position'], sanitize(response['title']), "  ".join(contributors), response['disk_number'], response['isrc'])
 
 
 # Download cover image from deezer
@@ -78,6 +78,7 @@ def download_deezer_track(track, quality, arl):
         quality_download = quality,
         recursive_quality = False,
         recursive_download = False,
+        not_interface = True,
         method_save = 2
     )
 
@@ -100,23 +101,51 @@ def download_album_from_deezer(url, quality, uid):
     if not path.exists(f'{normalized_dir}/cover.jpg'):
         download_deezer_cover(cover_url, f'{normalized_dir}', uid)
 
-    # Download tracks and rename
+    tracks_info = []
+    multi_cd = False
     for track in tracks:
-        nro, title, contributors, isrc = get_deezer_track_info(track)
+        nro, title, contributors, disk_number, isrc = get_deezer_track_info(track)
+        tracks_info.append({
+            'id': track,
+            'track': nro,
+            'title':title,
+            'contributors': contributors,
+            'isrc': isrc,
+            'disk_number': disk_number
+
+        })
+        if disk_number > 1:
+            multi_cd = True
+
+    # Download tracks and rename
+    for track in tracks_info:
+        track_id = track['id']
+        nro = track['track']
+        title = track['title']
+        contributors = track['contributors']
+        isrc = track['isrc']
+        disk_number = track['disk_number']        
+        
+        if multi_cd:
+            if not os.path.isdir(f'{normalized_dir}/CD{disk_number}'):
+                os.makedirs(f'{normalized_dir}/CD{disk_number}')
+
         deezer_file_name = f'{deezer_dw_dir}/{get_track_file(quality, contributors, title, isrc)}'
         # TODO verificar que el nombre tenga el formato correcto
-        filename = f'{str(nro).zfill(2)} - {title}{get_extension(quality)}'
-        if not path.exists(f'{normalized_dir}/{filename}'):
+        
+        filename = f'{str(nro).zfill(2)} - {title}{get_extension(quality)}'        
+        full_name = f'{normalized_dir}/CD{disk_number}/{filename}' if multi_cd else f'{normalized_dir}/{filename}'
+        if not path.exists(full_name):
             if not path.exists(f'{deezer_file_name}'):
                 send_message(uid, 'progress', f'Downloading {filename} ...')
                 try:
-                    download_deezer_track(track, quality, arl)
-                    os.rename(deezer_file_name, f'{normalized_dir}/{filename}')
+                    download_deezer_track(track_id, quality, arl)
+                    os.rename(deezer_file_name, full_name)
                     send_message(uid, 'progress', f'{filename} ✓')
                 except: 
                     send_message(uid, 'progress', f'{filename} ✗')
             else:
-                os.rename(deezer_file_name, f'{normalized_dir}/{filename}')
+                os.rename(deezer_file_name, full_name)
                 send_message(uid, 'progress', f'{filename} ✓')
         else:
             if path.exists(f'{deezer_file_name}'):
