@@ -1,0 +1,3 @@
+paho-mqtt~=1.6.1
+deezloader~=2022.3.5
+deezloader~=2022.3.5
