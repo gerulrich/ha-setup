@@ -12,10 +12,9 @@ import re
 import os.path
 from os import path
 from deezloader.deezloader import DeeLogin
-
+import music_tag
 
 client = mqtt.Client("mqtt-ha")
-
 
 def sanitize(value):
     invalid = '<>:"/\|?*&'
@@ -59,7 +58,7 @@ def get_deezer_track_info(track):
     contributors = []
     for c in response['contributors']:
         contributors.append(sanitize(c['name']))        
-    return (response['track_position'], sanitize(response['title']), "  ".join(contributors), response['disk_number'], response['isrc'])
+    return (response['track_position'], sanitize(response['title']), sanitize(response['title_short']), "  ".join(contributors), response['disk_number'], response['isrc'])
 
 
 # Download cover image from deezer
@@ -81,6 +80,45 @@ def download_deezer_track(track, quality, arl):
         not_interface = True,
         method_save = 2
     )
+
+def set_metadata(filename, artist, disk_number, multi_cd):
+    f = music_tag.load_file(filename)
+    
+    logging.info("------------------------")
+    
+    if multi_cd:
+        f['discnumber'] = disk_number
+    else:
+        logging.info("Removing discnumber and totaldiscs tags")
+        del f['totaldiscs']
+        del f['discnumber']
+
+    year_value = f['year'].value
+    if (match := re.match(r"^([0-9]{4}).+", str(year_value))) is not None:
+        year = match.group(1)
+        f['year'] = year
+        logging.info("Updating year to {year}")
+
+    artist_value = f['albumartist'].value
+    if artist_value != artist:
+        logging.info("Updating albumartist to {artist}")
+        f['albumartist'] = artist
+    
+    logging.info(f'Album: {f["album"]}')
+    logging.info(f'Album artist: {f["albumartist"]}')
+    logging.info(f'Artists: {f["artist"]}')
+    logging.info(f'DN: {f["discnumber"]}')
+    logging.info(f'TD: {f["totaldiscs"]}')
+    logging.info(f'TT: {f["totaltracks"]}')
+    logging.info(f'TN: {f["tracknumber"]}')
+    logging.info(f'Title: {f["tracktitle"]}')
+    
+    logging.info(f'codec: {f["#codec"]}')
+    logging.info(f'samplerate {f["#samplerate"]}')
+    logging.info(f'bitspersample: {f["#bitspersample"]}')
+    logging.info(f'bitrate: {f["#bitrate"]}')
+
+    f.save()
 
 def download_album_from_deezer(url, quality, uid):
     arl = os.getenv("ARL_COOKIE")
@@ -104,11 +142,12 @@ def download_album_from_deezer(url, quality, uid):
     tracks_info = []
     multi_cd = False
     for track in tracks:
-        nro, title, contributors, disk_number, isrc = get_deezer_track_info(track)
+        nro, title, title_short, contributors, disk_number, isrc = get_deezer_track_info(track)
         tracks_info.append({
             'id': track,
             'track': nro,
-            'title':title,
+            'title': title,
+            'title_short': title_short,
             'contributors': contributors,
             'isrc': isrc,
             'disk_number': disk_number
@@ -122,6 +161,7 @@ def download_album_from_deezer(url, quality, uid):
         track_id = track['id']
         nro = track['track']
         title = track['title']
+        title_short = track['title_short']
         contributors = track['contributors']
         isrc = track['isrc']
         disk_number = track['disk_number']        
@@ -130,10 +170,11 @@ def download_album_from_deezer(url, quality, uid):
             if not os.path.isdir(f'{normalized_dir}/CD{disk_number}'):
                 os.makedirs(f'{normalized_dir}/CD{disk_number}')
 
-        deezer_file_name = f'{deezer_dw_dir}/{get_track_file(quality, contributors, title, isrc)}'
-        # TODO verificar que el nombre tenga el formato correcto
-        
-        filename = f'{str(nro).zfill(2)} - {title}{get_extension(quality)}'        
+        deezer_file_name = f'{deezer_dw_dir}/{get_track_file(quality, contributors, title_short, isrc)}'
+        if not path.exists(deezer_file_name):
+            deezer_file_name = f'{deezer_dw_dir}/{get_track_file(quality, contributors, title, isrc)}'
+
+        filename = f'{str(nro).zfill(2)} - {title_short}{get_extension(quality)}'
         full_name = f'{normalized_dir}/CD{disk_number}/{filename}' if multi_cd else f'{normalized_dir}/{filename}'
         if not path.exists(full_name):
             if not path.exists(f'{deezer_file_name}'):
@@ -151,11 +192,12 @@ def download_album_from_deezer(url, quality, uid):
             if path.exists(f'{deezer_file_name}'):
                 os.remove(deezer_file_name)
             send_message(uid, 'progress', f'{filename} ✓')
-    
+        set_metadata(full_name, artist, disk_number, multi_cd)
+
     if path.exists(deezer_dw_dir):
         os.rmdir(deezer_dw_dir)
     send_message(uid, 'progress', 'Done')
-        
+
 
 def on_download_message(payload):
     url=payload['url']
