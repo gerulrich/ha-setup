@@ -13,10 +13,10 @@ from os import path
 
 from deezer_utils import *
 
-mqtt_host = os.getenv("MQTT_HOST") or '192.168.0.10'
-mqtt_user = os.getenv("MQTT_USER") or 'mqtt_deezer'
-mqtt_pass = os.getenv("MQTT_PASS") or 'deezer'
-arl = os.getenv("ARL_COOKIE") or '50753ab8a4e2ebcf778da01bf2cc501b2813d80461cfdaa4f3e39b424a5bf6021d91c736226ed42baf8c11de1205ecf8bf2d76e33b9bd45e90a21ab2eb0dd7212d4853538d53b84b51f8a2734142b08a46f3519be4c8defa9fe1b3b6b34e09ee'
+mqtt_host = os.getenv("MQTT_HOST")
+mqtt_user = os.getenv("MQTT_USER")
+mqtt_pass = os.getenv("MQTT_PASS")
+arl = os.getenv("ARL_COOKIE")
 
 client = mqtt.Client("deezer-dw")
 
