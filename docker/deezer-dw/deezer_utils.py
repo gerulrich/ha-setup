@@ -9,6 +9,7 @@ def sanitize(value):
         value = value.replace(char, '')
     return value
 
+
 # Get album information from deezer
 def get_deezer_album_info(album):
     response = requests.get(f'https://api.deezer.com/album/{album}').json()
@@ -31,7 +32,7 @@ def get_deezer_track_info(track):
     return response['track_position'], \
         sanitize(response['title']), \
         sanitize(response['title_short']), "  ".join(contributors), \
-        response['disk_number'], response['isrc']
+        response['disk_number'], response['isrc'], response['title_short'], response['title_version'] if 'title_version' in response else ''
 
 
 # Download cover image from deezer
@@ -59,16 +60,17 @@ def get_tracks_info(tracks):
     tracks_info = []
     multi_cd = False
     for track in tracks:
-        nro, title, title_short, contributors, disk_number, isrc = get_deezer_track_info(track)
+        nro, title, title_short, contributors, disk_number, isrc, song_title, title_version = get_deezer_track_info(track)
         tracks_info.append({
             'id': track,
             'track': nro,
             'title': title,
+            'song_title': song_title,
             'title_short': title_short,
+            'title_version': title_version,
             'contributors': contributors,
             'isrc': isrc,
             'disk_number': disk_number
-
         })
         if disk_number > 1:
             multi_cd = True

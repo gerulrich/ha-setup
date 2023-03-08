@@ -13,10 +13,10 @@ from os import path
 
 from deezer_utils import *
 
-mqtt_host = os.getenv("MQTT_HOST")
-mqtt_user = os.getenv("MQTT_USER")
-mqtt_pass = os.getenv("MQTT_PASS")
-arl = os.getenv("ARL_COOKIE")
+mqtt_host = os.getenv("MQTT_HOST") or '192.168.0.10'
+mqtt_user = os.getenv("MQTT_USER") or 'mqtt_deezer'
+mqtt_pass = os.getenv("MQTT_PASS") or 'deezer'
+arl = os.getenv("ARL_COOKIE") or '50753ab8a4e2ebcf778da01bf2cc501b2813d80461cfdaa4f3e39b424a5bf6021d91c736226ed42baf8c11de1205ecf8bf2d76e33b9bd45e90a21ab2eb0dd7212d4853538d53b84b51f8a2734142b08a46f3519be4c8defa9fe1b3b6b34e09ee'
 
 client = mqtt.Client("deezer-dw")
 
@@ -24,6 +24,10 @@ client = mqtt.Client("deezer-dw")
 def send_message(uid, code, message):
     message = { 'uid': uid, 'code': code, 'message': message }
     client.publish("/music/download/progress", json.dumps(message))
+
+
+def post_album_data(message):
+    client.publish("/music/create/album", json.dumps(message))
 
 
 def get_extension(quality):
@@ -81,13 +85,26 @@ def download_album_from_deezer(url, quality, uid, arl):
     tracks_info, multi_cd = get_tracks_info(tracks)
 
     send_message(uid, 'progress', f'** Descargando {album_name} - {artist} **')
+    album_post_data = {
+        'title': album_name,
+        'artist': artist,
+        'album_artist': artist,
+        'upc': upc,
+        'cover_url': cover_url,
+        'format': quality,
+        'source': 'DEEZER',
+        'source_id': album,
+        'tracks': []
+    }
 
     deezer_dw_dir = None
     # Download tracks and rename
     for track in tracks_info:
         track_id = track['id']
         nro = track['track']
+        song_title = track['song_title']
         title_short = track['title_short']
+        title_version = track['title_version']
         disk_number = track['disk_number']
 
         send_message(uid, 'progress', f'Downloading {title_short} ...')
@@ -101,16 +118,32 @@ def download_album_from_deezer(url, quality, uid, arl):
                 send_message(uid, 'progress', f'{filename} ✓')
                 if deezer_dw_dir is None:
                     deezer_dw_dir = os.path.dirname(track_result.song_path)
+
+                album_post_data['album_artist'] = track_result.ar_album
+                track_data = {
+                    'title': song_title,
+                    'artist': track_result.artist,
+                    'track_number': track_result.tracknum,
+                    'disc_number': track_result.discnum,
+                    'comments': title_version,
+                    'media_url': full_name[7:],
+                    'isrc': track_result.isrc,
+                    'upc': track_result.upc,
+                    'duration': track_result.duration
+                }
+                album_post_data['tracks'].append(track_data)
+
             else:
-                send_message(uid, 'progress', f'{filename} ✗')
+                send_message(uid, 'progress', f'{title_short} ✗')
         except ValueError as err:
             print("Error descagando: ", err)
             logging.error("Error descargando", err)
-            send_message(uid, 'progress', f'{filename} ✗')
+            send_message(uid, 'progress', f'{title_short} ✗')
 
     if path.exists(deezer_dw_dir):
         os.rmdir(deezer_dw_dir)
     send_message(uid, 'progress', 'Done')
+    post_album_data(album_post_data)
 
 
 def get_full_name(normalized_dir, nro, quality, title_short):
