@@ -17,10 +17,11 @@ def get_deezer_album_info(album):
     artist = sanitize(response['artist']['name'])
     upc = response['upc']
     cover_url = response['cover_xl']
+    release_date = response['release_date']
     tracks = []
     for track in response['tracks']['data']:
         tracks.append(track['id'])
-    return artist, album_name, tracks, upc, cover_url
+    return artist, album_name, tracks, upc, cover_url, release_date
 
 
 # Get track info form deezer

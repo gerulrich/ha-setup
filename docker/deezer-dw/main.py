@@ -8,6 +8,7 @@ import os
 import logging
 from threading import Thread
 import re
+import math
 import os.path
 from os import path
 
@@ -21,8 +22,8 @@ arl = os.getenv("ARL_COOKIE")
 client = mqtt.Client("deezer-dw")
 
 
-def send_message(uid, code, message):
-    message = { 'uid': uid, 'code': code, 'message': message }
+def send_message(uid, code, message, progress=0):
+    message = { 'uid': uid, 'code': code, 'message': message, 'progress' : progress }
     client.publish("/music/download/progress", json.dumps(message))
 
 
@@ -81,10 +82,15 @@ def create_directory(base_directory, artist, album_name, multi_cd, disk_number):
 def download_album_from_deezer(url, quality, uid, arl):
     match = re.search(r"https:\/\/.*\/album\/(\d+)", url)
     album = match.group(1)
-    artist, album_name, tracks, upc, cover_url = get_deezer_album_info(album)
+    artist, album_name, tracks, upc, cover_url, release_date = get_deezer_album_info(album)
     tracks_info, multi_cd = get_tracks_info(tracks)
 
-    send_message(uid, 'progress', f'** Descargando {album_name} - {artist} **')
+    if (match := re.match(r"^([0-9]{4}).*", str(release_date))) is not None:
+        year = match.group(1)
+    else:
+        year = None
+
+    send_message(uid, 'progress', f'** Descargando {album_name} - {artist} **', 0)
     album_post_data = {
         'title': album_name,
         'artist': artist,
@@ -94,12 +100,17 @@ def download_album_from_deezer(url, quality, uid, arl):
         'format': quality,
         'source': 'DEEZER',
         'source_id': album,
+        'year': year,
         'tracks': []
     }
 
     deezer_dw_dir = None
     # Download tracks and rename
+    progress = 0
+    total_tracks = len(tracks_info) + 1
+    track_nro = 0
     for track in tracks_info:
+        progress = math.floor(100 * (track_nro / total_tracks))
         track_id = track['id']
         nro = track['track']
         song_title = track['song_title']
@@ -107,7 +118,7 @@ def download_album_from_deezer(url, quality, uid, arl):
         title_version = track['title_version']
         disk_number = track['disk_number']
 
-        send_message(uid, 'progress', f'Downloading {title_short} ...')
+        send_message(uid, 'progress', f'Downloading {title_short} ...', progress)
         try:
             track_result = download_deezer_track(track_id, quality, arl)
             if track_result.success:
@@ -115,7 +126,7 @@ def download_album_from_deezer(url, quality, uid, arl):
                 filename, full_name = get_full_name(normalized_dir, nro, quality, title_short)
                 os.rename(track_result.song_path, full_name)
                 update_metadata(full_name, track_result.artist, disk_number, multi_cd)
-                send_message(uid, 'progress', f'{filename} ✓')
+                send_message(uid, 'progress', f'{filename} ✓', progress)
                 if deezer_dw_dir is None:
                     deezer_dw_dir = os.path.dirname(track_result.song_path)
 
@@ -134,15 +145,16 @@ def download_album_from_deezer(url, quality, uid, arl):
                 album_post_data['tracks'].append(track_data)
 
             else:
-                send_message(uid, 'progress', f'{title_short} ✗')
+                send_message(uid, 'progress', f'{title_short} ✗', progress)
         except ValueError as err:
             print("Error descagando: ", err)
             logging.error("Error descargando", err)
-            send_message(uid, 'progress', f'{title_short} ✗')
+            send_message(uid, 'progress', f'{title_short} ✗', progress)
+        track_nro += 1
 
     if path.exists(deezer_dw_dir):
         os.rmdir(deezer_dw_dir)
-    send_message(uid, 'progress', 'Done')
+    send_message(uid, 'progress', 'Done', 100)
     post_album_data(album_post_data)
 
 
